@@ -7,6 +7,7 @@ let g_desiredBackend = 0
 let g_isRunning = false
 let g_screenBuffer = null
 let g_requestAnimationFrame = null
+let g_lastFrameTimestamp = 0
 
 let audioCtx = null
 let keyA = false
@@ -17,6 +18,8 @@ let keyUp = false
 let keyDown = false
 let keyLeft = false
 let keyRight = false
+let keyFastForward = false
+let keySlowMotion = false
 
 
 export function main()
@@ -113,6 +116,16 @@ function handleKey(ev, down)
 			keyRight = down
 			break
 			
+		case "V":
+		case "v":
+			keyFastForward = down
+			break
+			
+		case "B":
+		case "b":
+			keySlowMotion = down
+			break
+			
 		default:
 			return
 	}
@@ -131,6 +144,7 @@ function reset()
 	
 	audioCtx = null
 	g_requestAnimationFrame = null
+	g_lastFrameTimestamp = 0
 	
 	let canvas = document.getElementById("canvasScreen")
 	let ctx = canvas.getContext("2d")
@@ -162,7 +176,8 @@ function loadJS(buffer)
 	console.log(emu)
 	
 	g_isRunning = true
-	g_requestAnimationFrame = window.requestAnimationFrame(() => runFrameJS(emu))
+	g_lastFrameTimestamp = 0
+	g_requestAnimationFrame = window.requestAnimationFrame(timestamp => runFrameJS(emu, timestamp))
 	
 	emu.cpu.hookExecuteInstruction = (addr, byte1, byte2, byte3) =>
 	{
@@ -240,21 +255,35 @@ function loadWasm(buffer)
 	g_screenBuffer = ctx.createImageData(256, 240)
 	
 	g_isRunning = true
-	g_requestAnimationFrame = window.requestAnimationFrame(() => runFrameWasm())
+	g_lastFrameTimestamp = 0
+	g_requestAnimationFrame = window.requestAnimationFrame((timestamp) => runFrameWasm(timestamp))
 }
 
 
-function runFrameJS(emu)
+function runFrameJS(emu, timestamp)
 {
-	for (let i = 0; i < 29780; i++)
-		emu.run()
+	let frameTime =
+		keyFastForward ? 1000 / 240 :
+		keySlowMotion ? 1000 / 15 :
+		1000 / 60
+	
+	if (g_lastFrameTimestamp < timestamp - frameTime * 5)
+		g_lastFrameTimestamp = timestamp - frameTime * 5
+	
+	while (g_lastFrameTimestamp <= timestamp - frameTime)
+	{
+		g_lastFrameTimestamp += frameTime
+
+		for (let i = 0; i < 29780; i++)
+			emu.run()
+	}
 	
 	if (g_isRunning)
-		g_requestAnimationFrame = window.requestAnimationFrame(() => runFrameJS(emu))
+		g_requestAnimationFrame = window.requestAnimationFrame(timestamp => runFrameJS(emu, timestamp))
 }
 
 
-function runFrameWasm()
+function runFrameWasm(timestamp)
 {
 	const controller1 =
 		(keyRight  ? 0x80 : 0) |
@@ -268,9 +297,22 @@ function runFrameWasm()
 	
 	try
 	{
-		g_wasm.instance.exports.wasm_core_set_controller1(controller1)
-		g_wasm.instance.exports.wasm_core_run_frame()
-		outputWasm()
+		let frameTime =
+			keyFastForward ? 1000 / 240 :
+			keySlowMotion ? 1000 / 15 :
+			1000 / 60
+
+		if (g_lastFrameTimestamp < timestamp - frameTime * 5)
+			g_lastFrameTimestamp = timestamp - frameTime * 5
+		
+		while (g_lastFrameTimestamp <= timestamp - frameTime)
+		{
+			g_lastFrameTimestamp += frameTime
+
+			g_wasm.instance.exports.wasm_core_set_controller1(controller1)
+			g_wasm.instance.exports.wasm_core_run_frame()
+			outputWasm()
+		}
 	}
 	catch (e)
 	{
@@ -279,7 +321,7 @@ function runFrameWasm()
 	}
 	
 	if (g_isRunning)
-		g_requestAnimationFrame = window.requestAnimationFrame(() => runFrameWasm())
+		g_requestAnimationFrame = window.requestAnimationFrame((timestamp) => runFrameWasm(timestamp))
 }
 
 
