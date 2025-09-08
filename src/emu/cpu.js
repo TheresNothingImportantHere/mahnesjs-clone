@@ -1284,6 +1284,8 @@ export class CPU
 	
 	throwUnhandledStep()
 	{
-		throw "unhandled opcode " + this.opcode.toString(16) + " step " + this.opcodeStep
+		this.endOpcode()
+		console.error("unhandled opcode " + this.opcode.toString(16) + " step " + this.opcodeStep)
+		//throw "unhandled opcode " + this.opcode.toString(16) + " step " + this.opcodeStep
 	}
 }
