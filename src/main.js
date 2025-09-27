@@ -71,22 +71,24 @@ function handleKey(ev, down)
 		case " ":
 		case "Z":
 		case "z":
+		case "Alt":
 			keyA = down
 			break
 			
 		case "X":
 		case "x":
+		case "Control":
 			keyB = down
 			break
 			
-		case "Control":
+		case "5":
 		case "Shift":
 		case "G":
 		case "g":
 			keySelect = down
 			break
 			
-		case "Enter":
+		case "1":
 		case "H":
 		case "h":
 			keyStart = down
